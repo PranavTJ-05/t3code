@@ -172,6 +172,39 @@ describe("mobile preferences state", () => {
     }),
   );
 
+  it.effect("reports each overlapping save's own outcome", () =>
+    Effect.gen(function* () {
+      const slowSave = deferred<void>();
+      const state = makePreferencesState({
+        load: Effect.succeed({}),
+        savePatch: (patch) =>
+          "baseFontSize" in patch
+            ? Effect.promise(() => slowSave.promise).pipe(
+                Effect.andThen(
+                  Effect.fail(
+                    new MobilePreferences.MobilePreferencesSaveError({
+                      cause: new Error("secure storage unavailable"),
+                    }),
+                  ),
+                ),
+              )
+            : Effect.succeed(patch),
+      });
+      const registry = AtomRegistry.make();
+      const unmount = registry.mount(state.preferencesAtom);
+
+      const failing = state.savePreferences.run(registry, { baseFontSize: 18 });
+      const succeeding = state.savePreferences.run(registry, { crashReportsEnabled: false });
+      slowSave.resolve();
+
+      expect((yield* Effect.promise(() => succeeding))._tag).toBe("Success");
+      expect((yield* Effect.promise(() => failing))._tag).toBe("Failure");
+
+      unmount();
+      registry.dispose();
+    }),
+  );
+
   it.effect("falls back to empty preferences when secure storage cannot be read", () =>
     Effect.gen(function* () {
       const state = makePreferencesState({

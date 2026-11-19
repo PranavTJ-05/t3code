@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import {
   activateManagedRelayAuthentication,
+  cleanUpManagedRelayAccount,
   deactivateManagedRelayAuthentication,
 } from "./managedAuth";
 
@@ -20,7 +21,10 @@ vi.mock("../lib/runtime", () => ({
 
 vi.mock("../connection/catalog", () => ({
   environmentCatalog: {
-    removeRelayEnvironments: {},
+    removeRelayEnvironments: {
+      label: "remove relay environments",
+      run: () => Promise.reject(new Error("Persistence removal failed.")),
+    },
   },
 }));
 
@@ -43,5 +47,9 @@ describe("managed relay authentication", () => {
 
     expect(appAtomRegistry.get(managedRelaySessionAtom)).toBeNull();
     await cleanup;
+  });
+
+  it("fails the account switch when the previous account's routes cannot be removed", async () => {
+    await expect(cleanUpManagedRelayAccount()).rejects.toThrow("Persistence removal failed.");
   });
 });

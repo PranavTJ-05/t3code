@@ -1,7 +1,13 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 
-import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
+import {
+  mobilePreferencesAtom,
+  saveMobilePreferences,
+  updateMobilePreferencesAtom,
+} from "../../state/preferences";
+import { useAtomCommand } from "../../state/use-atom-command";
 import { DEFAULT_PR_LIST_CONTROLS, type PullRequestListControls } from "./pullRequestList";
 import type { PullRequestSavedView } from "../../persistence/mobile-preferences";
 import { pullRequestSavedViewPreferences } from "./pullRequestSavedViews";
@@ -9,7 +15,7 @@ import { pullRequestSavedViewPreferences } from "./pullRequestSavedViews";
 export function usePullRequestListControls() {
   const preferences = useAtomValue(mobilePreferencesAtom);
   const savePreferences = useAtomSet(updateMobilePreferencesAtom);
-  const applyPreferences = useAtomSet(updateMobilePreferencesAtom, { mode: "promise" });
+  const applyPreferences = useAtomCommand(saveMobilePreferences, { reportFailure: false });
   const saved = AsyncResult.isSuccess(preferences)
     ? preferences.value.pullRequestListFilters
     : undefined;
@@ -38,10 +44,12 @@ export function usePullRequestListControls() {
         },
       }),
     });
-  const applyView = (view: PullRequestSavedView) =>
-    applyPreferences({
+  const applyView = async (view: PullRequestSavedView) => {
+    const result = await applyPreferences({
       transform: (current) => pullRequestSavedViewPreferences(current, view),
     });
+    if (result._tag === "Failure") throw squashAtomCommandFailure(result);
+  };
   return { environmentId, controlsFor, setEnvironmentId, setControls, applyView } as const;
 }
 

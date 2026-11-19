@@ -660,7 +660,8 @@ function startPendingDeviceRegistration(): void {
     );
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       // Refresh failures leave the relay's accepted registration intact; preserve registered status.
-      if (registrationStatus !== "registered") {
+      // A sign-out or account switch meanwhile owns the status, so an obsolete run leaves it alone.
+      if (generation === deviceRegistrationGeneration && registrationStatus !== "registered") {
         setRegistrationStatus("failed");
       }
       logRegistrationError(next.context, squashAtomCommandFailure(result));
