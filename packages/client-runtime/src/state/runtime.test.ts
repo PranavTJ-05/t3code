@@ -24,6 +24,7 @@ import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as Latch from "effect/Latch";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -1529,6 +1530,31 @@ describe("runtime command runner", () => {
     }
     registry.dispose();
   });
+
+  it.effect("stops a caller's own run when its signal aborts", () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>();
+      const stopped = yield* Deferred.make<void>();
+      const command = createRuntimeCommand(Atom.runtime(Layer.empty), {
+        label: "test.abortable",
+        execute: () =>
+          Deferred.succeed(started, undefined).pipe(
+            Effect.andThen(Effect.never),
+            Effect.onInterrupt(() => Deferred.succeed(stopped, undefined)),
+          ),
+      });
+      const registry = AtomRegistry.make();
+
+      const caller = yield* Effect.forkChild(
+        Effect.promise((signal) => command.run(registry, undefined, { signal })),
+      );
+      yield* Deferred.await(started);
+      yield* Fiber.interrupt(caller);
+
+      yield* Deferred.await(stopped);
+      registry.dispose();
+    }),
+  );
 
   it("serializes commands that share a scheduler and lane", async () => {
     const firstLatch = Latch.makeUnsafe();
