@@ -189,10 +189,11 @@ describe("ScheduledTasksSettings", () => {
     await userEvent.click(page.getByRole("menuitem", { name: "Delete", exact: true }));
     await userEvent.click(page.getByRole("button", { name: "Confirm", exact: true }));
     await vi.waitFor(() =>
-      expect(state.remove).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
-        environmentId,
-        input: { id: task.id },
-      }),
+      expect(state.remove).toHaveBeenCalledExactlyOnceWith(
+        expect.anything(),
+        { environmentId, input: { id: task.id } },
+        expect.anything(),
+      ),
     );
   });
 
